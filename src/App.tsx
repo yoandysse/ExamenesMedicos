@@ -4,24 +4,46 @@ import { ExamSession } from './components/exam/ExamSession';
 import { AdminDashboard } from './components/admin/AdminDashboard';
 import { QuestionManager } from './components/admin/QuestionManager';
 import { Navigation } from './components/Navigation';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { ToastProvider } from './components/Toast';
 import './globals.css';
 
 function App() {
   return (
-    <Router>
-      <div className="min-h-screen bg-background">
-        <Navigation />
-        <main className="container mx-auto px-4 py-8">
-          <Routes>
-            <Route path="/" element={<MainMenu />} />
-            <Route path="/exam" element={<ExamSession />} />
-            <Route path="/admin" element={<AdminDashboard />} />
-            <Route path="/admin/questions" element={<QuestionManager />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </main>
-      </div>
-    </Router>
+    <ErrorBoundary fallbackTitle="Error en la aplicación">
+      <ToastProvider>
+        <Router>
+          <div className="min-h-screen bg-background">
+            <Navigation />
+            <main className="container mx-auto px-4 py-8">
+              <Routes>
+                <Route path="/" element={
+                  <ErrorBoundary fallbackTitle="Error en el menú principal">
+                    <MainMenu />
+                  </ErrorBoundary>
+                } />
+                <Route path="/exam" element={
+                  <ErrorBoundary fallbackTitle="Error en el examen">
+                    <ExamSession />
+                  </ErrorBoundary>
+                } />
+                <Route path="/admin" element={
+                  <ErrorBoundary fallbackTitle="Error en el panel de administración">
+                    <AdminDashboard />
+                  </ErrorBoundary>
+                } />
+                <Route path="/admin/questions" element={
+                  <ErrorBoundary fallbackTitle="Error en el gestor de preguntas">
+                    <QuestionManager />
+                  </ErrorBoundary>
+                } />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </main>
+          </div>
+        </Router>
+      </ToastProvider>
+    </ErrorBoundary>
   );
 }
 

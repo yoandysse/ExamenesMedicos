@@ -1,53 +1,68 @@
 import { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { CheckCircle, XCircle, ArrowLeft, ArrowRight, Clock, BookOpen } from 'lucide-react';
 import { questionDB } from '@/database/browser';
 import { Question, ExamSession as ExamSessionType } from '@/types';
-import { CheckCircle, XCircle, ArrowLeft, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { LoadingState } from '@/components/LoadingComponents';
 
 export function ExamSession() {
   const [session, setSession] = useState<ExamSessionType | null>(null);
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
   const [timeElapsed, setTimeElapsed] = useState(0);
-  const [showResults, setShowResults] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isFinished, setIsFinished] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Inicializar sesión de examen
-    try {
-      const questions = questionDB.getRandom(20); // 20 preguntas aleatorias
-      if (questions.length === 0) {
-        alert('No hay preguntas disponibles');
-        navigate('/');
-        return;
+    // Initialize exam session
+    const initializeExam = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        
+        const questions = questionDB.getRandom(4);
+        
+        if (questions.length === 0) {
+          throw new Error('No hay preguntas disponibles en la base de datos');
+        }
+
+        const newSession: ExamSessionType = {
+          id: Date.now().toString(),
+          questions,
+          currentQuestionIndex: 0,
+          userAnswers: new Array(questions.length).fill(null),
+          startTime: new Date(),
+          isFinished: false,
+        };
+
+        setSession(newSession);
+        setCurrentQuestion(questions[0]);
+        setIsFinished(false);
+        
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
+        setError(errorMessage);
+      } finally {
+        setIsLoading(false);
       }
+    };
 
-      const newSession: ExamSessionType = {
-        id: Date.now().toString(),
-        questions,
-        currentQuestionIndex: 0,
-        userAnswers: new Array(questions.length).fill(null),
-        startTime: new Date(),
-        isFinished: false,
-      };
+    initializeExam();
+  }, []);
 
-      setSession(newSession);
-      setCurrentQuestion(questions[0]);
-    } catch (error) {
-      console.error('Error starting exam:', error);
-      navigate('/');
-    }
-  }, [navigate]);
-
-  // Timer para el examen
+  // Timer effect
   useEffect(() => {
-    if (showResults) return; // Detener timer si terminó el examen
+    if (!session || isFinished || isLoading) return;
+
     const timer = setInterval(() => {
       setTimeElapsed(prev => prev + 1);
     }, 1000);
+
     return () => clearInterval(timer);
-  }, [showResults]);
+  }, [session, isFinished, isLoading]);
 
   const selectAnswer = (answerIndex: number | null) => {
     if (!session || session.isFinished) return;
@@ -61,65 +76,6 @@ export function ExamSession() {
     });
   };
 
-  const nextQuestion = () => {
-    if (!session) return;
-
-    if (session.currentQuestionIndex < session.questions.length - 1) {
-      const nextIndex = session.currentQuestionIndex + 1;
-      setSession({
-        ...session,
-        currentQuestionIndex: nextIndex,
-      });
-      setCurrentQuestion(session.questions[nextIndex]);
-    }
-  };
-
-  const previousQuestion = () => {
-    if (!session) return;
-
-    if (session.currentQuestionIndex > 0) {
-      const prevIndex = session.currentQuestionIndex - 1;
-      setSession({
-        ...session,
-        currentQuestionIndex: prevIndex,
-      });
-      setCurrentQuestion(session.questions[prevIndex]);
-    }
-  };
-
-  const finishExam = () => {
-    if (!session) return;
-
-    const correctAnswers = session.userAnswers.filter(
-      (answer, index) => answer === session.questions[index].correctAnswer
-    ).length;
-
-    const score = correctAnswers;
-    const percentage = (correctAnswers / session.questions.length) * 100;
-
-    setSession({
-      ...session,
-      isFinished: true,
-      endTime: new Date(),
-      score,
-      percentage,
-      totalTimeMinutes: Math.floor(timeElapsed / 60),
-    });
-
-    setShowResults(true);
-  };
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const getAnsweredCount = () => {
-    if (!session) return 0;
-    return session.userAnswers.filter(answer => answer !== null).length;
-  };
-
   const goToQuestion = (index: number) => {
     if (!session || index < 0 || index >= session.questions.length) return;
     
@@ -130,24 +86,117 @@ export function ExamSession() {
     setCurrentQuestion(session.questions[index]);
   };
 
-  if (!session || !currentQuestion) {
+  const nextQuestion = () => {
+    if (!session) return;
+    
+    if (session.currentQuestionIndex < session.questions.length - 1) {
+      const nextIndex = session.currentQuestionIndex + 1;
+      goToQuestion(nextIndex);
+    }
+  };
+
+  const previousQuestion = () => {
+    if (!session) return;
+    
+    if (session.currentQuestionIndex > 0) {
+      const prevIndex = session.currentQuestionIndex - 1;
+      goToQuestion(prevIndex);
+    }
+  };
+
+  const finishExam = () => {
+    if (!session) return;
+
+    try {
+      const correctAnswers = session.userAnswers.filter(
+        (answer, index) => answer === session.questions[index].correctAnswer
+      ).length;
+
+      const score = correctAnswers;
+      const percentage = (correctAnswers / session.questions.length) * 100;
+      const endTime = new Date();
+
+      const completedSession: ExamSessionType = {
+        ...session,
+        isFinished: true,
+        endTime,
+        score,
+        percentage,
+        totalTimeMinutes: Math.floor(timeElapsed / 60),
+      };
+
+      setSession(completedSession);
+      setIsFinished(true);
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Error al finalizar el examen';
+      setError(errorMessage);
+    }
+  };
+
+  const restartExam = () => {
+    setSession(null);
+    setCurrentQuestion(null);
+    setTimeElapsed(0);
+    setIsFinished(false);
+    setError(null);
+    window.location.reload();
+  };
+
+  const getAnsweredCount = () => {
+    if (!session) return 0;
+    return session.userAnswers.filter(answer => answer !== null).length;
+  };
+
+  const getProgress = () => {
+    if (!session) return 0;
+    return (getAnsweredCount() / session.questions.length) * 100;
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  if (error) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div>Cargando examen...</div>
+      <div className="min-h-screen bg-gradient-to-br from-red-50 to-white flex items-center justify-center p-4">
+        <Card className="w-full max-w-2xl shadow-xl border-red-100">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl font-bold text-red-800 flex items-center justify-center gap-2">
+              <XCircle className="h-8 w-8" />
+              Error en el Examen
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-center space-y-4">
+            <p className="text-red-600">{error}</p>
+            <div className="flex justify-center space-x-4">
+              <Button onClick={restartExam} variant="outline">
+                Intentar nuevamente
+              </Button>
+              <Button onClick={() => navigate('/')}>
+                Volver al inicio
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
-  if (showResults) {
-    // Calcular score y porcentaje si no están en session
-    const correctAnswers = session.userAnswers.filter(
-      (answer, index) => answer === session.questions[index].correctAnswer
-    ).length;
-    const score = correctAnswers;
-    const percentage = (correctAnswers / session.questions.length) * 100;
+  if (isLoading) {
+    return <LoadingState type="exam" />;
+  }
+
+  if (!session || !currentQuestion) {
+    return <LoadingState message="Preparando el examen..." />;
+  }
+
+  if (isFinished && session.score !== undefined && session.percentage !== undefined) {
     return (
       <div className="max-w-4xl mx-auto space-y-6">
-        <Card>
+        <Card className="shadow-xl border-green-100">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <CheckCircle className="h-6 w-6 text-green-500" />
@@ -156,64 +205,102 @@ export function ExamSession() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
-              <div>
-                <div className="text-3xl font-bold">{score}</div>
-                <div className="text-sm text-muted-foreground">Respuestas Correctas</div>
+              <div className="p-4 bg-blue-50 rounded-lg">
+                <div className="text-3xl font-bold text-blue-700">{session.score}</div>
+                <div className="text-sm text-blue-600">Respuestas Correctas</div>
               </div>
-              <div>
-                <div className="text-3xl font-bold">{percentage.toFixed(1)}%</div>
-                <div className="text-sm text-muted-foreground">Porcentaje</div>
+              <div className="p-4 bg-green-50 rounded-lg">
+                <div className="text-3xl font-bold text-green-700">{session.percentage.toFixed(1)}%</div>
+                <div className="text-sm text-green-600">Porcentaje</div>
               </div>
-              <div>
-                <div className="text-3xl font-bold">{formatTime(timeElapsed)}</div>
-                <div className="text-sm text-muted-foreground">Tiempo Total</div>
+              <div className="p-4 bg-purple-50 rounded-lg">
+                <div className="text-3xl font-bold text-purple-700">{formatTime(timeElapsed)}</div>
+                <div className="text-sm text-purple-600">Tiempo Total</div>
               </div>
             </div>
-            <div className="flex justify-center space-x-4 mt-4">
-              <Button onClick={() => navigate('/')}>Volver al Inicio</Button>
-              <Button variant="outline" onClick={() => window.location.reload()}>Nuevo Examen</Button>
+            
+            {/* Progress Bar */}
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>Progreso del examen</span>
+                <span>{session.score}/{session.questions.length}</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-3">
+                <div 
+                  className="bg-gradient-to-r from-blue-500 to-green-500 h-3 rounded-full transition-all duration-500"
+                  style={{ width: `${session.percentage}%` }}
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-center space-x-4 mt-6">
+              <Button onClick={() => navigate('/')} className="flex items-center gap-2">
+                <BookOpen className="h-4 w-4" />
+                Volver al Inicio
+              </Button>
+              <Button variant="outline" onClick={restartExam} className="flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                Nuevo Examen
+              </Button>
             </div>
           </CardContent>
         </Card>
 
-        {/* Revisar respuestas */}
-        <Card>
+        {/* Detailed Review */}
+        <Card className="shadow-xl">
           <CardHeader>
-            <CardTitle>Revisión de Respuestas</CardTitle>
+            <CardTitle>Revisión Detallada de Respuestas</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-6">
             {session.questions.map((question, index) => {
               const userAnswer = session.userAnswers[index];
               const isCorrect = userAnswer === question.correctAnswer;
 
               return (
-                <div key={question.id} className="border rounded-lg p-4">
-                  <div className="flex items-start space-x-2 mb-2">
+                <div key={question.id} className={`border rounded-lg p-6 ${isCorrect ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`}>
+                  <div className="flex items-start space-x-3 mb-4">
                     {isCorrect ? (
-                      <CheckCircle className="h-5 w-5 text-green-500 mt-0.5" />
+                      <CheckCircle className="h-6 w-6 text-green-500 mt-0.5 flex-shrink-0" />
                     ) : (
-                      <XCircle className="h-5 w-5 text-red-500 mt-0.5" />
+                      <XCircle className="h-6 w-6 text-red-500 mt-0.5 flex-shrink-0" />
                     )}
-                    <div className="flex-1">
-                      <h4 className="font-medium">Pregunta {index + 1}</h4>
-                      <p className="text-sm text-muted-foreground mb-2">{question.question}</p>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-semibold text-lg mb-2">Pregunta {index + 1}</h4>
+                      <p className="text-gray-800 mb-4">{question.question}</p>
 
-                      <div className="space-y-1">
+                      <div className="space-y-2">
                         {question.options.map((option, optionIndex) => (
                           <div
                             key={optionIndex}
-                            className={`text-sm p-2 rounded ${
+                            className={`p-3 rounded-lg text-sm ${
                               optionIndex === question.correctAnswer
-                                ? 'bg-green-100 text-green-800'
+                                ? 'bg-green-100 text-green-800 font-semibold border border-green-300'
                                 : optionIndex === userAnswer && !isCorrect
-                                ? 'bg-red-100 text-red-800'
-                                : 'bg-gray-50'
+                                ? 'bg-red-100 text-red-800 border border-red-300'
+                                : 'bg-gray-50 text-gray-700'
                             }`}
                           >
-                            {option} {optionIndex === question.correctAnswer && '✓'}
-                            {optionIndex === userAnswer && optionIndex !== question.correctAnswer && '✗'}
+                            <span className="font-medium">
+                              {String.fromCharCode(65 + optionIndex)}.
+                            </span>
+                            {' '}{option}
+                            {optionIndex === question.correctAnswer && (
+                              <CheckCircle className="inline h-4 w-4 text-green-600 ml-2" />
+                            )}
+                            {optionIndex === userAnswer && optionIndex !== question.correctAnswer && (
+                              <XCircle className="inline h-4 w-4 text-red-600 ml-2" />
+                            )}
                           </div>
                         ))}
+                        {userAnswer === null && (
+                          <div className="p-3 rounded-lg bg-gray-100 text-gray-600 text-sm italic">
+                            Sin respuesta
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="mt-3 text-xs text-gray-500">
+                        <strong>Categoría:</strong> {question.category} | <strong>Fuente:</strong> {question.source}
                       </div>
                     </div>
                   </div>
@@ -228,94 +315,206 @@ export function ExamSession() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white pb-16">
-      <header className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-200 shadow-sm">
-        <div className="max-w-4xl mx-auto flex items-center justify-between py-4 px-6">
-          <h1 className="text-2xl font-bold text-blue-900 tracking-tight">Test</h1>
+      <header className="sticky top-0 z-10 bg-white/90 backdrop-blur border-b border-gray-200 shadow-sm">
+        <div className="max-w-6xl mx-auto flex items-center justify-between py-4 px-6">
+          <h1 className="text-2xl font-bold text-blue-900 tracking-tight">Examen COT</h1>
           <div className="flex items-center gap-4">
-            <span className="bg-green-200 text-green-800 px-3 py-1 rounded-full font-semibold text-sm">Tiempo test {Math.floor(timeElapsed/60)}:{String(timeElapsed%60).padStart(2,'0')}</span>
+            <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-lg shadow-sm border border-blue-100">
+              <Clock className="h-4 w-4 text-blue-600" />
+              <span className="text-blue-800 font-semibold text-sm">
+                {formatTime(timeElapsed)}
+              </span>
+            </div>
+            <div className="text-sm text-blue-600">
+              Pregunta {session.currentQuestionIndex + 1} de {session.questions.length}
+            </div>
           </div>
         </div>
       </header>
-      <main className="max-w-4xl mx-auto px-4 pt-10">
-        {session && currentQuestion && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="md:col-span-2">
-              <Card className="shadow-xl border-blue-100">
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-xl font-bold text-blue-900">{session.currentQuestionIndex + 1}.</CardTitle>
-                  {/* Marcar para revisión, etc. */}
-                </CardHeader>
-                <CardContent>
-                  <h2 className="font-semibold text-lg text-blue-800 mb-4">{currentQuestion.question}</h2>
-                  <div className="space-y-2">
-                    {currentQuestion.options.map((option, optionIndex) => (
-                      <label key={optionIndex} className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition border ${session.userAnswers[session.currentQuestionIndex] === optionIndex ? 'bg-blue-50 border-blue-300' : 'bg-white border-gray-200 hover:bg-blue-100'}`}>
-                        <input
-                          type="radio"
-                          name="answer"
-                          checked={session.userAnswers[session.currentQuestionIndex] === optionIndex}
-                          onChange={() => selectAnswer(optionIndex)}
-                          className="form-radio h-5 w-5 text-blue-600"
-                        />
-                        <span className="text-blue-900 font-medium">{String.fromCharCode(65 + optionIndex)}. {option}</span>
-                      </label>
-                    ))}
-                    <label className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition border bg-gray-50 border-gray-200 hover:bg-gray-100">
+
+      <main className="max-w-6xl mx-auto px-4 pt-8">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+          {/* Main Question Area */}
+          <div className="lg:col-span-3">
+            <Card className="shadow-xl border-blue-100">
+              <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-xl font-bold text-blue-900">
+                    {session.currentQuestionIndex + 1}.
+                  </CardTitle>
+                  <div className="text-xs text-blue-600">
+                    {currentQuestion.category}
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="p-6">
+                <h2 className="font-semibold text-lg text-gray-800 mb-6 leading-relaxed">
+                  {currentQuestion.question}
+                </h2>
+                
+                <div className="space-y-3">
+                  {currentQuestion.options.map((option, optionIndex) => (
+                    <label 
+                      key={optionIndex} 
+                      className={`flex items-start gap-3 p-4 rounded-lg cursor-pointer transition-all duration-200 border-2 hover:shadow-md ${
+                        session.userAnswers[session.currentQuestionIndex] === optionIndex 
+                          ? 'bg-blue-50 border-blue-300 shadow-sm' 
+                          : 'bg-white border-gray-200 hover:bg-blue-25 hover:border-blue-200'
+                      }`}
+                    >
                       <input
                         type="radio"
-                        name="answer"
-                        checked={session.userAnswers[session.currentQuestionIndex] === null}
-                        onChange={() => selectAnswer(null)}
-                        className="form-radio h-5 w-5 text-gray-400"
+                        name={`question-${session.currentQuestionIndex}`}
+                        checked={session.userAnswers[session.currentQuestionIndex] === optionIndex}
+                        onChange={() => selectAnswer(optionIndex)}
+                        className="form-radio h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0"
                       />
-                      <span className="text-gray-500 italic">Dejar sin respuesta</span>
+                      <div className="flex-1">
+                        <span className="font-semibold text-blue-600 mr-2">
+                          {String.fromCharCode(65 + optionIndex)}.
+                        </span>
+                        <span className="text-gray-800">{option}</span>
+                      </div>
                     </label>
-                  </div>
-                  <div className="flex justify-between mt-8">
-                    <Button variant="outline" className="px-6 py-2" onClick={previousQuestion} disabled={session.currentQuestionIndex === 0}>
-                      <ArrowLeft className="mr-2 h-5 w-5" /> Anterior
+                  ))}
+                  
+                  <label className="flex items-start gap-3 p-4 rounded-lg cursor-pointer transition-all duration-200 border-2 bg-gray-50 border-gray-200 hover:bg-gray-100">
+                    <input
+                      type="radio"
+                      name={`question-${session.currentQuestionIndex}`}
+                      checked={session.userAnswers[session.currentQuestionIndex] === null}
+                      onChange={() => selectAnswer(null)}
+                      className="form-radio h-5 w-5 text-gray-400 mt-0.5 flex-shrink-0"
+                    />
+                    <span className="text-gray-500 italic">Dejar sin respuesta</span>
+                  </label>
+                </div>
+
+                <div className="flex justify-between items-center mt-8 pt-6 border-t border-gray-200">
+                  <Button 
+                    variant="outline" 
+                    onClick={previousQuestion} 
+                    disabled={session.currentQuestionIndex === 0}
+                    className="flex items-center gap-2"
+                  >
+                    <ArrowLeft className="h-4 w-4" /> 
+                    Anterior
+                  </Button>
+                  
+                  {session.currentQuestionIndex === session.questions.length - 1 ? (
+                    <Button 
+                      onClick={finishExam}
+                      className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-2"
+                    >
+                      <CheckCircle className="h-4 w-4" />
+                      Finalizar Examen
                     </Button>
-                    {session.currentQuestionIndex === session.questions.length - 1 ? (
-                      <Button className="bg-green-600 hover:bg-green-700 text-white px-6 py-2" onClick={finishExam}>
-                        Finalizar y revisar examen
-                      </Button>
-                    ) : (
-                      <Button className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2" onClick={nextQuestion}>
-                        Siguiente <ArrowRight className="ml-2 h-5 w-5" />
-                      </Button>
-                    )}
+                  ) : (
+                    <Button 
+                      onClick={nextQuestion}
+                      className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2"
+                    >
+                      Siguiente 
+                      <ArrowRight className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Sidebar */}
+          <div className="lg:col-span-1">
+            <div className="sticky top-32 space-y-6">
+              {/* Progress Card */}
+              <Card className="shadow-lg border-blue-100">
+                <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 pb-3">
+                  <CardTitle className="text-sm font-semibold text-blue-800">
+                    Progreso del Examen
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-4">
+                  <div className="space-y-4">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Respondidas:</span>
+                      <span className="font-semibold text-blue-600">
+                        {getAnsweredCount()}/{session.questions.length}
+                      </span>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div 
+                          className="bg-gradient-to-r from-blue-500 to-green-500 h-2 rounded-full transition-all duration-300"
+                          style={{ width: `${getProgress()}%` }}
+                        />
+                      </div>
+                      <div className="text-center text-xs text-gray-500">
+                        {getProgress().toFixed(0)}% completado
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Question Navigation Grid */}
+              <Card className="shadow-lg border-blue-100">
+                <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 pb-3">
+                  <CardTitle className="text-sm font-semibold text-blue-800">
+                    Navegación
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-4">
+                  <div className="grid grid-cols-2 gap-2">
+                    {session.questions.map((_, index) => (
+                      <button
+                        key={index}
+                        onClick={() => goToQuestion(index)}
+                        className={`w-full h-12 rounded-lg text-sm font-semibold transition-all duration-200 border-2 ${
+                          session.currentQuestionIndex === index
+                            ? 'bg-blue-600 text-white border-blue-700 shadow-lg'
+                            : session.userAnswers[index] !== null
+                            ? 'bg-green-100 text-green-800 border-green-300 hover:bg-green-200'
+                            : 'bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200'
+                        }`}
+                        title={`Pregunta ${index + 1} ${session.userAnswers[index] !== null ? '(Respondida)' : '(Sin respuesta)'}`}
+                      >
+                        {index + 1}
+                      </button>
+                    ))}
+                  </div>
+                  
+                  <Button 
+                    onClick={finishExam} 
+                    className="w-full mt-4 bg-green-600 hover:bg-green-700 text-white font-bold"
+                  >
+                    Finalizar Examen
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Quick Stats */}
+              <Card className="shadow-lg border-blue-100">
+                <CardContent className="p-4">
+                  <div className="space-y-3 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Sin respuesta:</span>
+                      <span className="font-semibold text-red-600">
+                        {session.questions.length - getAnsweredCount()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Tiempo activo:</span>
+                      <span className="font-semibold text-blue-600">
+                        {formatTime(timeElapsed)}
+                      </span>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
             </div>
-            <div>
-              <div className="bg-white rounded-xl shadow p-4 border border-blue-50 mb-6">
-                <div className="flex items-center gap-4 mb-2">
-                  <span className="text-gray-500 text-sm">{session.questions.length - getAnsweredCount()} Sin respuesta</span>
-                  <span className="text-blue-500 text-sm">{getAnsweredCount()} Respondidas</span>
-                </div>
-                <div className="grid grid-cols-5 gap-2">
-                  {session.questions.map((_, idx) => (
-                    <button 
-                      key={idx} 
-                      className={`w-10 h-10 rounded-lg border text-sm font-semibold transition hover:bg-blue-50
-                        ${session.userAnswers[idx] === null ? 'bg-gray-100 border-gray-300 text-gray-500' : 'bg-blue-100 border-blue-300 text-blue-700'}
-                        ${session.currentQuestionIndex === idx ? 'ring-2 ring-blue-500' : ''}
-                      `} 
-                      onClick={() => goToQuestion(idx)}
-                    >
-                      {idx + 1}
-                    </button>
-                  ))}
-                </div>
-                <Button className="w-full mt-6 bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded-lg" onClick={finishExam}>
-                  Finalizar
-                </Button>
-              </div>
-            </div>
           </div>
-        )}
-        {/* Resultados y modal de revisión se pueden mejorar similarmente */}
+        </div>
       </main>
     </div>
   );
