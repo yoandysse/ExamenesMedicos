@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { questionDB } from '@/database/browser';
 import { Question, ExamSession as ExamSessionType } from '@/types';
-import { Clock, CheckCircle, XCircle, ArrowLeft, ArrowRight } from 'lucide-react';
+import { CheckCircle, XCircle, ArrowLeft, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export function ExamSession() {
@@ -49,7 +49,7 @@ export function ExamSession() {
     return () => clearInterval(timer);
   }, [showResults]);
 
-  const selectAnswer = (answerIndex: number) => {
+  const selectAnswer = (answerIndex: number | null) => {
     if (!session || session.isFinished) return;
 
     const updatedAnswers = [...session.userAnswers];
@@ -118,6 +118,16 @@ export function ExamSession() {
   const getAnsweredCount = () => {
     if (!session) return 0;
     return session.userAnswers.filter(answer => answer !== null).length;
+  };
+
+  const goToQuestion = (index: number) => {
+    if (!session || index < 0 || index >= session.questions.length) return;
+    
+    setSession({
+      ...session,
+      currentQuestionIndex: index,
+    });
+    setCurrentQuestion(session.questions[index]);
   };
 
   if (!session || !currentQuestion) {
@@ -238,18 +248,28 @@ export function ExamSession() {
                 <CardContent>
                   <h2 className="font-semibold text-lg text-blue-800 mb-4">{currentQuestion.question}</h2>
                   <div className="space-y-2">
-                    {["Dejar sin respuesta", ...currentQuestion.options].map((opt, idx) => (
-                      <label key={idx} className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition border ${session.userAnswers[session.currentQuestionIndex] === idx-1 ? 'bg-blue-50 border-blue-300' : 'bg-white border-gray-200 hover:bg-blue-100'}`}>
+                    {currentQuestion.options.map((option, optionIndex) => (
+                      <label key={optionIndex} className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition border ${session.userAnswers[session.currentQuestionIndex] === optionIndex ? 'bg-blue-50 border-blue-300' : 'bg-white border-gray-200 hover:bg-blue-100'}`}>
                         <input
                           type="radio"
                           name="answer"
-                          checked={session.userAnswers[session.currentQuestionIndex] === idx-1}
-                          onChange={() => selectAnswer(idx-1)}
+                          checked={session.userAnswers[session.currentQuestionIndex] === optionIndex}
+                          onChange={() => selectAnswer(optionIndex)}
                           className="form-radio h-5 w-5 text-blue-600"
                         />
-                        <span className={idx === 0 ? 'text-gray-500' : 'text-blue-900 font-medium'}>{opt}</span>
+                        <span className="text-blue-900 font-medium">{String.fromCharCode(65 + optionIndex)}. {option}</span>
                       </label>
                     ))}
+                    <label className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition border bg-gray-50 border-gray-200 hover:bg-gray-100">
+                      <input
+                        type="radio"
+                        name="answer"
+                        checked={session.userAnswers[session.currentQuestionIndex] === null}
+                        onChange={() => selectAnswer(null)}
+                        className="form-radio h-5 w-5 text-gray-400"
+                      />
+                      <span className="text-gray-500 italic">Dejar sin respuesta</span>
+                    </label>
                   </div>
                   <div className="flex justify-between mt-8">
                     <Button variant="outline" className="px-6 py-2" onClick={previousQuestion} disabled={session.currentQuestionIndex === 0}>
@@ -271,18 +291,24 @@ export function ExamSession() {
             <div>
               <div className="bg-white rounded-xl shadow p-4 border border-blue-50 mb-6">
                 <div className="flex items-center gap-4 mb-2">
-                  <span className="text-gray-500 text-sm">{session.userAnswers.filter(a => a === null).length} Sin respuesta</span>
-                  <span className="text-blue-500 text-sm">{session.userAnswers.filter(a => a !== null).length} Respondidas</span>
+                  <span className="text-gray-500 text-sm">{session.questions.length - getAnsweredCount()} Sin respuesta</span>
+                  <span className="text-blue-500 text-sm">{getAnsweredCount()} Respondidas</span>
                 </div>
                 <div className="grid grid-cols-5 gap-2">
                   {session.questions.map((_, idx) => (
-                    <button key={idx} className={`w-10 h-10 rounded-lg border text-sm font-semibold transition
-                      ${session.userAnswers[idx] === null ? 'bg-gray-100 border-gray-300 text-gray-500' : 'bg-blue-100 border-blue-300 text-blue-700'}
-                      ${session.currentQuestionIndex === idx ? 'ring-2 ring-blue-500' : ''}
-                    `} onClick={() => {/* lógica ir a pregunta */}}>{idx+1}</button>
+                    <button 
+                      key={idx} 
+                      className={`w-10 h-10 rounded-lg border text-sm font-semibold transition hover:bg-blue-50
+                        ${session.userAnswers[idx] === null ? 'bg-gray-100 border-gray-300 text-gray-500' : 'bg-blue-100 border-blue-300 text-blue-700'}
+                        ${session.currentQuestionIndex === idx ? 'ring-2 ring-blue-500' : ''}
+                      `} 
+                      onClick={() => goToQuestion(idx)}
+                    >
+                      {idx + 1}
+                    </button>
                   ))}
                 </div>
-                <Button className="w-full mt-6 bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded-lg" onClick={() => setShowResults(true)}>
+                <Button className="w-full mt-6 bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded-lg" onClick={finishExam}>
                   Finalizar
                 </Button>
               </div>
