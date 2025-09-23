@@ -3,6 +3,18 @@ import { Question, QuestionImport } from '@/types';
 
 const db = new Database('exam-platform.db');
 
+// Define database row interface
+interface QuestionRow {
+  id: number;
+  question: string;
+  options: string;
+  correctAnswer: number;
+  source: string;
+  category: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 // Crear tabla de preguntas
 db.exec(`
   CREATE TABLE IF NOT EXISTS questions (
@@ -36,31 +48,31 @@ export const questionDB = {
   // Obtener todas las preguntas
   getAll: (): Question[] => {
     const stmt = db.prepare('SELECT * FROM questions ORDER BY id DESC');
-    const rows = stmt.all();
+    const rows = stmt.all() as QuestionRow[];
     return rows.map(row => ({
       ...row,
-      options: JSON.parse(row.options as string)
+      options: JSON.parse(row.options)
     })) as Question[];
   },
 
   // Obtener pregunta por ID
   getById: (id: number): Question | undefined => {
     const stmt = db.prepare('SELECT * FROM questions WHERE id = ?');
-    const row = stmt.get(id);
+    const row = stmt.get(id) as QuestionRow | undefined;
     if (!row) return undefined;
     return {
       ...row,
-      options: JSON.parse(row.options as string)
+      options: JSON.parse(row.options)
     } as Question;
   },
 
   // Obtener preguntas aleatorias
   getRandom: (count: number): Question[] => {
     const stmt = db.prepare('SELECT * FROM questions ORDER BY RANDOM() LIMIT ?');
-    const rows = stmt.all(count);
+    const rows = stmt.all(count) as QuestionRow[];
     return rows.map(row => ({
       ...row,
-      options: JSON.parse(row.options as string)
+      options: JSON.parse(row.options)
     })) as Question[];
   },
 
@@ -106,18 +118,18 @@ export const questionDB = {
   // Obtener preguntas por categoría
   getByCategory: (category: string): Question[] => {
     const stmt = db.prepare('SELECT * FROM questions WHERE category = ? ORDER BY id DESC');
-    const rows = stmt.all(category);
+    const rows = stmt.all(category) as QuestionRow[];
     return rows.map(row => ({
       ...row,
-      options: JSON.parse(row.options as string)
+      options: JSON.parse(row.options)
     })) as Question[];
   },
 
   // Obtener todas las categorías
   getCategories: (): string[] => {
     const stmt = db.prepare('SELECT DISTINCT category FROM questions ORDER BY category');
-    const rows = stmt.all();
-    return rows.map(row => row.category) as string[];
+    const rows = stmt.all() as { category: string }[];
+    return rows.map(row => row.category);
   },
 
   // Buscar preguntas
@@ -128,10 +140,10 @@ export const questionDB = {
       ORDER BY id DESC
     `);
     const term = `%${searchTerm}%`;
-    const rows = stmt.all(term, term, term);
+    const rows = stmt.all(term, term, term) as QuestionRow[];
     return rows.map(row => ({
       ...row,
-      options: JSON.parse(row.options as string)
+      options: JSON.parse(row.options)
     })) as Question[];
   },
 

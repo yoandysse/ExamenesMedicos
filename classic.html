@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plataforma de Exámenes COT - Versión Clásica</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Menú Principal -->
+    <div id="main-menu" class="section">
+        <div class="container">
+            <div class="header">
+                <h1>🏥 Plataforma de Exámenes COT</h1>
+                <p>Especialización en Cirugía Ortopédica y Traumatología</p>
+            </div>
+
+            <div class="stats-container">
+                <div class="stat-card">
+                    <div class="stat-number" id="total-questions">0</div>
+                    <div class="stat-label">Preguntas disponibles</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="user-average">0%</div>
+                    <div class="stat-label">Promedio personal</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="total-exams">0</div>
+                    <div class="stat-label">Exámenes realizados</div>
+                </div>
+            </div>
+
+            <div class="menu-options">
+                <div class="option-card">
+                    <h3>🎯 Examen Completo</h3>
+                    <p>Examen con todas las preguntas disponibles</p>
+                    <button onclick="startExam(questionsDatabase.length)" class="btn-primary">Iniciar Examen Completo</button>
+                </div>
+
+                <div class="option-card">
+                    <h3>⚡ Examen Rápido</h3>
+                    <p>Examen con 10 preguntas aleatorias</p>
+                    <button onclick="startExam(10)" class="btn-primary">Examen de 10 preguntas</button>
+                </div>
+
+                <div class="option-card">
+                    <h3>🔥 Examen Intensivo</h3>
+                    <p>Examen con 50 preguntas aleatorias</p>
+                    <button onclick="startExam(50)" class="btn-primary">Examen de 50 preguntas</button>
+                </div>
+
+                <div class="option-card">
+                    <h3>📚 Modo Práctica</h3>
+                    <p>Práctica sin límite de tiempo</p>
+                    <button onclick="showPracticeMode()" class="btn-secondary">Activar Modo Práctica</button>
+                </div>
+
+                <div class="option-card">
+                    <h3>📊 Estadísticas</h3>
+                    <p>Ver tu rendimiento histórico</p>
+                    <button onclick="showStats()" class="btn-secondary">Ver Estadísticas</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sección de Examen -->
+    <div id="exam-section" class="section hidden">
+        <div class="container">
+            <div class="exam-header">
+                <div class="exam-info">
+                    <h2 id="question-counter">Pregunta 1 de 50</h2>
+                    <div class="progress-container">
+                        <div class="progress-bar">
+                            <div id="progress-fill" class="progress-fill"></div>
+                        </div>
+                        <span id="question-number">1</span>
+                    </div>
+                    <div class="timer-container">
+                        <span class="timer-icon">⏱️</span>
+                        <span id="timer">00:00</span>
+                    </div>
+                </div>
+                <button onclick="exitExam()" class="btn-exit">❌ Salir</button>
+            </div>
+
+            <div class="question-container">
+                <div class="question-content">
+                    <h3 id="question-text">Cargando pregunta...</h3>
+                    <div class="question-meta">
+                        <span id="question-source">Fuente: </span>
+                        <span id="question-category">Categoría: </span>
+                    </div>
+                </div>
+
+                <div id="options-container" class="options-container">
+                    <!-- Las opciones se generarán dinámicamente -->
+                </div>
+
+                <div class="navigation-buttons">
+                    <button id="prev-btn" onclick="previousQuestion()" class="btn-nav">⬅️ Anterior</button>
+                    <button id="next-btn" onclick="nextQuestion()" class="btn-nav">Siguiente ➡️</button>
+                    <button id="finish-btn" onclick="finishExam()" class="btn-finish hidden">🏁 Finalizar Examen</button>
+                </div>
+            </div>
+
+            <div id="question-grid" class="question-grid">
+                <!-- Grid de navegación de preguntas -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Sección de Resultados -->
+    <div id="results-section" class="section hidden">
+        <div class="container">
+            <div class="results-header">
+                <h1>🎉 ¡Examen Completado!</h1>
+                <div class="score-display">
+                    <div class="score-circle">
+                        <span id="score-percentage">0%</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="results-stats">
+                <div class="result-stat">
+                    <div class="stat-icon">✅</div>
+                    <div class="stat-info">
+                        <span class="stat-value" id="correct-answers">0/0</span>
+                        <span class="stat-label">Respuestas correctas</span>
+                    </div>
+                </div>
+
+                <div class="result-stat">
+                    <div class="stat-icon">⏱️</div>
+                    <div class="stat-info">
+                        <span class="stat-value" id="total-time">00:00</span>
+                        <span class="stat-label">Tiempo total</span>
+                    </div>
+                </div>
+
+                <div class="result-stat">
+                    <div class="stat-icon">📊</div>
+                    <div class="stat-info">
+                        <span class="stat-value" id="performance-level">Excelente</span>
+                        <span class="stat-label">Rendimiento</span>
+                    </div>
+                </div>
+            </div>
+
+            <div id="results-chart" class="chart-container">
+                <!-- Gráfico de resultados -->
+            </div>
+
+            <div class="results-actions">
+                <button onclick="reviewAnswers()" class="btn-primary">🔍 Revisar Respuestas</button>
+                <button onclick="retakeExam()" class="btn-secondary">🔄 Repetir Examen</button>
+                <button onclick="backToMenu()" class="btn-secondary">🏠 Volver al Menú</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Revisión -->
+    <div id="review-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📝 Revisión de Respuestas</h2>
+                <span class="close" onclick="closeReviewModal()">❌</span>
+            </div>
+            <div id="review-content" class="modal-body">
+                <!-- Contenido de revisión -->
+            </div>
+        </div>
+    </div>
+
+    <script src="questions-data.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

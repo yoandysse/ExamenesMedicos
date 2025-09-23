@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
-import { questionDB } from '@/database/memory';
+import { questionDB } from '@/database/browser';
 import { Question, ExamSession as ExamSessionType } from '@/types';
 import { Clock, CheckCircle, XCircle, ArrowLeft, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
