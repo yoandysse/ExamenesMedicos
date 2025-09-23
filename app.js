@@ -67,13 +67,28 @@ function displayQuestion() {
 
     // Actualizar contador
     document.getElementById('question-counter').textContent = `Pregunta ${questionIndex + 1} de ${totalQuestions}`;
-    document.getElementById('question-number').textContent = questionIndex + 1;
-    document.getElementById('question-source').textContent = question.source;
+    
+    // Verificar si el elemento existe antes de actualizarlo
+    const questionNumberElement = document.getElementById('question-number');
+    if (questionNumberElement) {
+        questionNumberElement.textContent = questionIndex + 1;
+    }
+    
+    document.getElementById('question-source').textContent = `Fuente: ${question.source}`;
     document.getElementById('question-text').textContent = question.question;
+    
+    // Actualizar categoría si el elemento existe
+    const categoryElement = document.getElementById('question-category');
+    if (categoryElement) {
+        categoryElement.textContent = `Categoría: ${question.category}`;
+    }
 
-    // Actualizar barra de progreso
-    const progress = ((questionIndex + 1) / totalQuestions) * 100;
-    document.getElementById('progress-fill').style.width = `${progress}%`;
+    // Actualizar barra de progreso si existe
+    const progressFillElement = document.getElementById('progress-fill');
+    if (progressFillElement) {
+        const progress = ((questionIndex + 1) / totalQuestions) * 100;
+        progressFillElement.style.width = `${progress}%`;
+    }
 
     // Generar opciones
     generateOptions(question, questionIndex);
@@ -424,6 +439,21 @@ function loadUserStats() {
     // Cargar estadísticas al iniciar la aplicación
     const stats = getUserStats();
     console.log('Estadísticas cargadas:', stats);
+    
+    // Actualizar UI con estadísticas
+    const totalQuestionsElement = document.getElementById('total-questions');
+    const userAverageElement = document.getElementById('user-average');
+    const totalExamsElement = document.getElementById('total-exams');
+    
+    if (totalQuestionsElement) {
+        totalQuestionsElement.textContent = questionsDatabase.length;
+    }
+    if (userAverageElement) {
+        userAverageElement.textContent = Math.round(stats.averageScore) + '%';
+    }
+    if (totalExamsElement) {
+        totalExamsElement.textContent = stats.totalExams;
+    }
 }
 
 // Eventos de teclado

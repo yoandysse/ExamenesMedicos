@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
-import { questionDB } from '@/database/memory';
+import { questionDB } from '@/database/browser';
 import { Question, QuestionImport } from '@/types';
-import { Search, Trash2, Edit, Plus, Upload, Download } from 'lucide-react';
+import { Trash2, Edit, Plus, Upload, Download } from 'lucide-react';
 
 export function QuestionManager() {
   const [questions, setQuestions] = useState<Question[]>([]);

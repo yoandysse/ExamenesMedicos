@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
-import { questionDB } from '@/database/memory';
-import { Question } from '@/types';
+import { questionDB } from '@/database/browser';
 import { BarChart3, Database, Upload, Plus, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 

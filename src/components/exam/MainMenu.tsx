@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
-import { questionDB } from '@/database/memory';
+import { questionDB } from '@/database/browser';
 import { Play, Users, BookOpen, BarChart3 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
