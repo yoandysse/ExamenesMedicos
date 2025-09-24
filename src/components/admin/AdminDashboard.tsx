@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
-import { questionDB } from '@/database/browser';
-import { BarChart3, Database, Upload, Plus, Search } from 'lucide-react';
+import { questionDB, isUsingSupabase } from '@/database/config';
+import { BarChart3, Database, Upload, Plus, Search, Loader2, AlertCircle, Cloud, HardDrive, ArrowLeftRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export function AdminDashboard() {
@@ -11,13 +11,22 @@ export function AdminDashboard() {
     categories: 0,
     recentlyAdded: 0
   });
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const navigate = useNavigate();
 
   useEffect(() => {
+    loadStats();
+  }, []);
+
+  const loadStats = async () => {
     try {
-      const questions = questionDB.getAll();
-      const categories = questionDB.getCategories();
+      setIsLoading(true);
+      setError(null);
+      
+      const questions = await questionDB.getAll();
+      const categories = await questionDB.getCategories();
 
       // Calcular preguntas agregadas en los últimos 7 días
       const lastWeek = new Date();
@@ -33,8 +42,11 @@ export function AdminDashboard() {
       });
     } catch (error) {
       console.error('Error loading stats:', error);
+      setError('Error al cargar las estadísticas');
+    } finally {
+      setIsLoading(false);
     }
-  }, []);
+  };
 
   return (
     <div className="max-w-6xl mx-auto space-y-8">
@@ -45,7 +57,24 @@ export function AdminDashboard() {
         <p className="text-lg text-muted-foreground">
           Gestiona el banco de preguntas y configura la plataforma
         </p>
+        <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+          {isUsingSupabase ? (
+            <><Cloud className="h-4 w-4" /> Usando Supabase</>
+          ) : (
+            <><HardDrive className="h-4 w-4" /> Usando localStorage</>
+          )}
+        </div>
       </div>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-2 text-red-700">
+          <AlertCircle className="h-5 w-5" />
+          <span>{error}</span>
+          <Button variant="outline" size="sm" onClick={loadStats} className="ml-auto">
+            Reintentar
+          </Button>
+        </div>
+      )}
 
       {/* Estadísticas */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -57,10 +86,19 @@ export function AdminDashboard() {
             <Database className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.totalQuestions}</div>
-            <p className="text-xs text-muted-foreground">
-              Preguntas en el banco
-            </p>
+            {isLoading ? (
+              <div className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="text-sm">Cargando...</span>
+              </div>
+            ) : (
+              <>
+                <div className="text-2xl font-bold">{stats.totalQuestions}</div>
+                <p className="text-xs text-muted-foreground">
+                  Preguntas en el banco
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -72,10 +110,19 @@ export function AdminDashboard() {
             <BarChart3 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.categories}</div>
-            <p className="text-xs text-muted-foreground">
-              Áreas temáticas diferentes
-            </p>
+            {isLoading ? (
+              <div className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="text-sm">Cargando...</span>
+              </div>
+            ) : (
+              <>
+                <div className="text-2xl font-bold">{stats.categories}</div>
+                <p className="text-xs text-muted-foreground">
+                  Áreas temáticas diferentes
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -87,16 +134,25 @@ export function AdminDashboard() {
             <Plus className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.recentlyAdded}</div>
-            <p className="text-xs text-muted-foreground">
-              Últimos 7 días
-            </p>
+            {isLoading ? (
+              <div className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="text-sm">Cargando...</span>
+              </div>
+            ) : (
+              <>
+                <div className="text-2xl font-bold">{stats.recentlyAdded}</div>
+                <p className="text-xs text-muted-foreground">
+                  Últimos 7 días
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
 
       {/* Acciones principales */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
@@ -104,7 +160,7 @@ export function AdminDashboard() {
               <span>Gestionar Preguntas</span>
             </CardTitle>
             <CardDescription>
-              Ver, editar y eliminar preguntas del banco de datos
+              Ver, editar, eliminar y crear preguntas del banco
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -121,33 +177,50 @@ export function AdminDashboard() {
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <Upload className="h-5 w-5" />
-              <span>Importar Preguntas</span>
+              <span>Importar/Exportar</span>
             </CardTitle>
             <CardDescription>
-              Subir preguntas en lote usando un formato específico
+              Importar y exportar preguntas en formato JSON
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="text-sm text-muted-foreground space-y-2">
-              <p><strong>Formato de importación (JSON):</strong></p>
-              <pre className="bg-muted p-3 rounded-md text-xs overflow-x-auto">
-{`[
-  {
-    "question": "Texto de la pregunta",
-    "options": ["Opción A", "Opción B", "Opción C", "Opción D"],
-    "correctAnswer": 0,
-    "source": "Fuente del examen",
-    "category": "Categoría"
-  }
-]`}
-              </pre>
-            </div>
-            <Button variant="outline" className="w-full">
+          <CardContent>
+            <Button 
+              variant="outline" 
+              className="w-full mb-2"
+              onClick={() => navigate('/admin/questions')}
+            >
               <Upload className="mr-2 h-4 w-4" />
-              Seleccionar Archivo JSON
+              Ir a Importar/Exportar
             </Button>
+            <p className="text-xs text-muted-foreground">
+              Funciones completas disponibles en el gestor
+            </p>
           </CardContent>
         </Card>
+
+        {isUsingSupabase && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <ArrowLeftRight className="h-5 w-5" />
+                <span>Migración</span>
+              </CardTitle>
+              <CardDescription>
+                Transferir datos de localStorage a Supabase
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button 
+                variant="outline" 
+                className="w-full"
+                onClick={() => navigate('/admin/migration')}
+              >
+                <ArrowLeftRight className="mr-2 h-4 w-4" />
+                Abrir Panel de Migración
+              </Button>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Información del formato */}

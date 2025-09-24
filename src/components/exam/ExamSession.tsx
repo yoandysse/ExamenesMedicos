@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { CheckCircle, XCircle, ArrowLeft, ArrowRight, Clock, BookOpen } from 'lucide-react';
-import { questionDB } from '@/database/browser';
+import { questionDB, examResultsDB } from '@/database/config';
 import { Question, ExamSession as ExamSessionType } from '@/types';
 import { useNavigate } from 'react-router-dom';
 import { LoadingState } from '@/components/LoadingComponents';
@@ -23,7 +23,7 @@ export function ExamSession() {
         setIsLoading(true);
         setError(null);
         
-        const questions = questionDB.getRandom(4);
+        const questions = await questionDB.getRandom(20);
         
         if (questions.length === 0) {
           throw new Error('No hay preguntas disponibles en la base de datos');
@@ -104,7 +104,7 @@ export function ExamSession() {
     }
   };
 
-  const finishExam = () => {
+  const finishExam = async () => {
     if (!session) return;
 
     try {
@@ -115,6 +115,7 @@ export function ExamSession() {
       const score = correctAnswers;
       const percentage = (correctAnswers / session.questions.length) * 100;
       const endTime = new Date();
+      const totalTimeMinutes = Math.floor(timeElapsed / 60);
 
       const completedSession: ExamSessionType = {
         ...session,
@@ -122,8 +123,23 @@ export function ExamSession() {
         endTime,
         score,
         percentage,
-        totalTimeMinutes: Math.floor(timeElapsed / 60),
+        totalTimeMinutes,
       };
+
+      // Guardar resultado en la base de datos
+      try {
+        await examResultsDB.save({
+          sessionId: session.id,
+          score,
+          percentage,
+          totalQuestions: session.questions.length,
+          correctAnswers,
+          totalTimeMinutes,
+        });
+      } catch (saveError) {
+        console.warn('Error saving exam result:', saveError);
+        // No bloqueamos la finalización del examen si hay error guardando
+      }
 
       setSession(completedSession);
       setIsFinished(true);

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { questionDB, examResultsDB } from '@/database/browser';
+import { questionDB, examResultsDB } from '@/database/config';
 import { Question, ExamSession, ExamResult } from '@/types';
 import { useToast } from '@/components/Toast';
 
@@ -28,7 +28,7 @@ export function useExam(options: UseExamOptions = {}) {
       setIsLoading(true);
       setError(null);
       
-      const questions = questionDB.getRandom(questionCount);
+      const questions = await questionDB.getRandom(questionCount);
       
       if (questions.length === 0) {
         throw new Error('No hay preguntas disponibles en la base de datos');
@@ -156,7 +156,7 @@ export function useExam(options: UseExamOptions = {}) {
     }
   }, [session, goToQuestion]);
 
-  const finishExam = useCallback(() => {
+  const finishExam = useCallback(async () => {
     if (!session) return;
 
     try {
@@ -190,7 +190,12 @@ export function useExam(options: UseExamOptions = {}) {
 
       // Save to database
       if (autoSave) {
-        examResultsDB.save(result);
+        try {
+          await examResultsDB.save(result);
+        } catch (saveError) {
+          console.warn('Error saving exam result:', saveError);
+          toast.warning('Advertencia', 'El resultado se guardó localmente pero no se pudo sincronizar');
+        }
       }
 
       setSession(completedSession);
